@@ -1,0 +1,148 @@
+//Write a parallel program for Matrix Addition
+
+#include <iostream>
+#include "mpi.h"
+using namespace std;
+
+int main()
+{
+    int size, rank;
+    MPI_Status status;
+    MPI_Init(NULL, NULL);
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if (rank == 0) {
+        int rows, cols;
+        cout << "Enter the number of rows in the matrices: ";
+        cin >> rows;
+        cout << "Enter the number of columns in the matrices: ";
+        cin >> cols;
+
+        int a[100][100], b[100][100];
+        cout << "Enter elements of the first matrix:" << endl;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                cin >> a[i][j];
+            }
+        }
+        cout << "Enter elements of the second matrix:" << endl;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                cin >> b[i][j];
+            }
+        }
+        cout << endl << endl;
+
+        int rows_per_process = rows / size;
+        int i = 0;
+        int start_row = 0;
+
+        // Sending the number of rows and cols to all processes except the last one
+        for (i = 1; i < size - 1; i++) {
+            start_row = i * rows_per_process;
+            MPI_Send(&rows_per_process, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Send(&start_row, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Send(&cols, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+        }
+
+        // Sending the number of rows and remaining cols to the last process
+        int rows_rem = rows - (i * rows_per_process);
+        start_row = i * rows_per_process;
+        if (rows_rem) {
+            MPI_Send(&rows_rem, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Send(&start_row, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+            MPI_Send(&cols, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+        }
+
+        i = 0;
+        // Sending partial matrices to all the processes except the last one
+        for (i = 1; i < size - 1; i++) {
+            for (int j = (i * rows_per_process); j < ((i + 1) * rows_per_process); j++) {
+                MPI_Send(&a[j], cols, MPI_INT, i, 2, MPI_COMM_WORLD);
+                MPI_Send(&b[j], cols, MPI_INT, i, 3, MPI_COMM_WORLD);
+            }
+        }
+
+        // Sending partial matrices to the last process
+        if (rows_rem) {
+            for (int j = start_row; j < start_row + rows_rem; j++) {
+                MPI_Send(&a[j], cols, MPI_INT, i, 2, MPI_COMM_WORLD);
+                MPI_Send(&b[j], cols, MPI_INT, i, 3, MPI_COMM_WORLD);
+            }
+        }
+
+        int result[100][100];
+        // Calculating the sum from the partial matrices alloted to Process 0
+        //cout << "For process " << rank + 1 << ", Start row: 0" << " End row: " << rows_per_process - 1 << endl;
+        //cout << "Sum calculated by Process " << rank + 1 << " is as follows:" << endl;
+        for (int i = rank * rows_per_process; i < (rank + 1) * rows_per_process; i++) {
+            for (int j = 0; j < cols; j++) {
+                result[i][j] = a[i][j] + b[i][j];
+                cout << result[i][j] << " ";
+            }
+            //cout << endl;
+        }
+        //cout << endl << endl;
+
+        // Receiving the partial sum matrices from all the slave processes
+        i = 0;
+        for (i = 1; i < size - 1; i++) {
+            for (int j = (i * rows_per_process); j < ((i + 1) * rows_per_process); j++) {
+                MPI_Recv(&result[j], cols, MPI_INT, i, 4, MPI_COMM_WORLD, &status);
+            }
+        }
+
+        if (rows_rem) {
+            for (int j = start_row; j < start_row + rows_rem; j++) {
+                MPI_Recv(&result[j], cols, MPI_INT, i, 4, MPI_COMM_WORLD, &status);
+            }
+        }
+
+        // Displaying the final matrix
+        cout << "The resultant matrix is:" << endl;
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                cout << result[i][j] << " ";
+            }
+            cout << endl;
+        }
+
+    }
+    else {
+        int rows, cols, start_row;
+        int a[100][100], b[100][100], c[100][100];
+
+        // Receiving the number of rows and cols for the process
+        MPI_Recv(&rows, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(&start_row, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Recv(&cols, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+        //cout << "For process " << rank + 1 << ", Start row: " << start_row << " End row: " << start_row + rows - 1 << endl;
+
+        // Receiving the partial matrices for the process
+        for (int i = start_row; i < start_row + rows; i++) {
+            MPI_Recv(&a[i], cols, MPI_INT, 0, 2, MPI_COMM_WORLD, &status);
+            MPI_Recv(&b[i], cols, MPI_INT, 0, 3, MPI_COMM_WORLD, &status);
+        }
+
+        // Calculating the sum of the matrices
+        //cout << "Sum calculated by Process " << rank + 1 << " is as follows:" << endl;
+        for (int i = start_row; i < (start_row + rows); i++) {
+            for (int j = 0; j < cols; j++) {
+                c[i][j] = a[i][j] + b[i][j];
+                //cout << c[i][j] << " ";
+            }
+            //cout << endl;
+        }
+        //cout << endl << endl;
+
+        // Sending the partial sum matrix to the master process(Process 0)
+        for (int i = start_row; i < (start_row + rows); i++) {
+            MPI_Send(&c[i], cols, MPI_INT, 0, 4, MPI_COMM_WORLD);
+        }
+    }
+
+    MPI_Finalize();
+    return 0;
+}

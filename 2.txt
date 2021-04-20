@@ -1,0 +1,18 @@
+//Write a parallel program to print hello with size and rank of the processes.
+
+#include <stdlib.h>
+#include <stdio.h>
+#include "mpi.h"
+#include<string.h>
+
+int main(int argc, char* argv[]) 
+{
+	int size, rank;
+	int arr;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	printf("Hello from process %d of %d\n", rank, size);
+	MPI_Finalize();
+	exit(0);
+}

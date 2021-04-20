@@ -1,0 +1,17 @@
+//Write a parallel program to scatter the data to the processes from an array.
+
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc, char** argv)
+{
+	int rank, size, scatteredNum;
+	int data[4] = {10, 20 , 30, 40};
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Scatter(data, 1, MPI_INT, &scatteredNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	printf("Processor %d received %d \n", rank, scatteredNum);	
+	MPI_Finalize();
+}
